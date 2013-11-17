@@ -23,4 +23,9 @@ class MyDaemon(Daemon):
 
 
 if __name__ == '__main__':
-    MyDaemon(log, os.path.abspath('tests/daemons/run/test.pid'), stop_timeout=1).execute()
+    MyDaemon(
+        log=log,
+        pidfile=os.path.abspath('tests/daemons/run/test.pid'),
+        user='vagrant',
+        stop_timeout=1
+    ).execute()

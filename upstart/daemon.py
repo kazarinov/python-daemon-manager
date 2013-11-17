@@ -2,6 +2,7 @@
 import sys, os, atexit
 import inspect
 import signal
+import pwd
 import time
 import optparse
 import re
@@ -13,13 +14,14 @@ class Daemon(object):
     """
     Usage: subclass the Daemon class and override the run() method
     """
-    def __init__(self, log, pidfile=None, stop_timeout=5, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    def __init__(self, log, pidfile=None, user=None, stop_timeout=5, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         self.log = log
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         self.default_pidfile = pidfile is not None
         self.pidfile = pidfile
+        self.user = user
         self.stop_timeout = stop_timeout
         self._manager = None
         self.DEBUG = False
@@ -49,6 +51,15 @@ class Daemon(object):
         os.chdir("/")
         os.setsid()
         os.umask(0)
+
+        if self.user:
+            pw_record = pwd.getpwnam(self.user)
+            user_uid = pw_record.pw_uid
+            user_gid = pw_record.pw_gid
+            print 'uid:gif', user_uid, user_gid
+            os.setgid(user_gid)
+            os.setuid(user_uid)
+
 
         # do second fork
         try:
@@ -92,6 +103,7 @@ class Daemon(object):
 
     def start(self, daemonize=True):
         """
+        Don't override!
         Start the daemon
         """
         if self.pid:
@@ -123,6 +135,7 @@ class Daemon(object):
 
     def stop(self, force=False):
         """
+        Don't override!
         Stop the daemon
         """
         pid = self.pid
@@ -156,6 +169,7 @@ class Daemon(object):
 
     def restart(self):
         """
+        Don't override!
         Restart the daemon
         """
         self.stop()
@@ -201,6 +215,7 @@ class Daemon(object):
 
     def status(self):
         '''
+        Don't override!
         @param args tuple (key, value)
         '''
         pid = self.pid
