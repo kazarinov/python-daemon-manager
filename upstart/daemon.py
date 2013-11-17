@@ -14,7 +14,14 @@ class Daemon(object):
     """
     Usage: subclass the Daemon class and override the run() method
     """
-    def __init__(self, log, pidfile=None, user=None, stop_timeout=5, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    def __init__(self,
+                 log,
+                 pidfile=None,
+                 user=None,
+                 stop_timeout=5,
+                 stdin='/dev/null',
+                 stdout='/dev/null',
+                 stderr='/dev/null'):
         self.log = log
         self.stdin = stdin
         self.stdout = stdout
@@ -37,15 +44,16 @@ class Daemon(object):
             self._manager = ProcessManager()
         return self._manager
 
-    def daemonize(self):
-        try:
-            pid = os.fork()
-            if pid > 0:
-                # exit first parent
-                sys.exit(0)
-        except OSError, e:
-            sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
-            sys.exit(1)
+    def daemonize(self, expect='daemon'):
+        if expect == 'daemon':
+            try:
+                pid = os.fork()
+                if pid > 0:
+                    # exit first parent
+                    sys.exit(0)
+            except OSError, e:
+                sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sys.exit(1)
 
         # decouple from parent environment
         os.chdir("/")
@@ -56,20 +64,19 @@ class Daemon(object):
             pw_record = pwd.getpwnam(self.user)
             user_uid = pw_record.pw_uid
             user_gid = pw_record.pw_gid
-            print 'uid:gif', user_uid, user_gid
             os.setgid(user_gid)
             os.setuid(user_uid)
 
-
-        # do second fork
-        try:
-            pid = os.fork()
-            if pid > 0:
-                # exit from second parent
-                sys.exit(0)
-        except OSError, e:
-            sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
-            sys.exit(1)
+        if expect == 'daemon' or expect == 'fork':
+            # do second fork
+            try:
+                pid = os.fork()
+                if pid > 0:
+                    # exit from second parent
+                    sys.exit(0)
+            except OSError, e:
+                sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sys.exit(1)
 
         # write pidfile
         pid = str(os.getpid())
@@ -101,7 +108,7 @@ class Daemon(object):
             pid = None
         return pid
 
-    def start(self, daemonize=True):
+    def start(self, daemonize='daemon'):
         """
         Don't override!
         Start the daemon
@@ -111,8 +118,7 @@ class Daemon(object):
             sys.exit(1)
         else:
             self.pre_start()
-            if daemonize:
-                self.daemonize()
+            self.daemonize(expect=daemonize)
             self.log.debug('starting daemon...')
             self.run(**self.run_args)
 
@@ -218,6 +224,7 @@ class Daemon(object):
         Don't override!
         @param args tuple (key, value)
         '''
+        result = False
         pid = self.pid
         if pid is None:
             print 'stopped'
@@ -229,12 +236,14 @@ class Daemon(object):
                 if re.search(self.get_grepline(), process.cmdline):
                     self.manager.get(self.pid)
                     print 'running ({pid})'.format(pid=self.pid)
+                    result = True
                 else:
                     print "pid {pid} is found but it belongs to another process".format(pid=pid)
 
         lost_processes = self.get_lost_processes()
         if lost_processes:
             print 'lost pids: %s' % ','.join([str(process.pid) for process in lost_processes])
+        return result
 
     def run(self, **kwargs):
         """
@@ -269,15 +278,21 @@ class Daemon(object):
 
     def execute(self):
         daemon = self.daemon
+        optparser = optparse.OptionParser()
+        optparser.set_usage('Usage: {daemon} [options] (start|stop|stop-force|restart|reload|status)'.format(daemon=daemon))
+
+        if len(sys.argv) < 2:
+            optparser.print_usage()
+            sys.exit(1)
+
         command_args = inspect.getargspec(self.run)
         arg_names = command_args.args[1:]
         args = {}
 
-        for i in xrange(len(command_args.defaults), 0, -1):
-            args[arg_names[-i]] = command_args.defaults[-i]
+        if command_args.defaults:
+            for i in xrange(len(command_args.defaults), 0, -1):
+                args[arg_names[-i]] = command_args.defaults[-i]
 
-        optparser = optparse.OptionParser()
-        optparser.set_usage('Usage: {daemon} [options] (start|stop|stop-force|restart|reload|status)'.format(daemon=daemon))
         if not self.default_pidfile:
             optparser.add_option('-p', '--pid', dest='pid', help='destination of a pid file')
         optparser.add_option('-d', '--debug', action="store_true", dest='debug', default=False, help='debug mode')
