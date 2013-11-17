@@ -23,6 +23,7 @@ class Daemon(object):
         self.stop_timeout = stop_timeout
         self._manager = None
         self.DEBUG = False
+        self.run_args = {}
         signal.signal(signal.SIGHUP, self._sighup_hook)
 
     def _sighup_hook(self, signum, frame):
@@ -101,7 +102,7 @@ class Daemon(object):
             if daemonize:
                 self.daemonize()
             self.log.debug('starting daemon...')
-            self.run()
+            self.run(**self.run_args)
 
     def terminate(self, pid, force=False):
         try:
@@ -253,22 +254,44 @@ class Daemon(object):
 
     def execute(self):
         daemon = self.daemon
-        run_args = inspect.getargspec(self.run)
-        arg_names = run_args.args[1:]
+        command_args = inspect.getargspec(self.run)
+        arg_names = command_args.args[1:]
+        args = {}
+
+        for i in xrange(len(command_args.defaults), 0, -1):
+            args[arg_names[-i]] = command_args.defaults[-i]
 
         optparser = optparse.OptionParser()
         optparser.set_usage('Usage: {daemon} [options] (start|stop|stop-force|restart|reload|status)'.format(daemon=daemon))
         if not self.default_pidfile:
             optparser.add_option('-p', '--pid', dest='pid', help='destination of a pid file')
-        optparser.add_option('-d', '--debug', action="store_true", dest='debug', help='debug mode')
-        for arg in arg_names:
-            optparser.add_option('--%s' % arg, dest=arg, help=arg)
-        options, args = optparser.parse_args()
+        optparser.add_option('-d', '--debug', action="store_true", dest='debug', default=False, help='debug mode')
 
+        for arg_name in arg_names:
+            try:
+                if isinstance(args[arg_name], bool):
+                    if args[arg_name]:
+                        optparser.add_option('--%s' % arg_name, action='store_false', default=args[arg_name],
+                                             dest=arg_name, help=arg_name)
+                    else:
+                        optparser.add_option('--%s' % arg_name, action='store_true', default=args[arg_name],
+                                             dest=arg_name, help=arg_name)
+                else:
+                    optparser.add_option('--%s' % arg_name, dest=arg_name, default=args[arg_name], help=arg_name)
+            except KeyError:
+                optparser.add_option('--%s' % arg_name, dest=arg_name, help=arg_name)
+
+        options, _ = optparser.parse_args()
         if not self.default_pidfile:
             self.pidfile = getattr(options, 'pid')
             if not self.pidfile:
                 optparser.error('pid file must be specified')
+
+        for arg_name in arg_names:
+            if arg_name not in args and getattr(options, arg_name) is None:
+                optparser.error('%s must be specified' % arg_name)
+            else:
+                self.run_args[arg_name] = getattr(options, arg_name)
 
         self.DEBUG = bool(getattr(options, 'debug'))
 

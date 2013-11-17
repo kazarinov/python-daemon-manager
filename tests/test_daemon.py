@@ -12,7 +12,10 @@ class TestConsole(unittest.TestCase):
         return command.stdout.read()
 
     def command(self, daemon, command, args=None):
-        result = self.call('./run_daemon.sh {daemon} {command}'.format(daemon=daemon, command=command))
+        if args is None:
+            args = {}
+        options = ['--%s=%s' % (key, value) for key, value in args.iteritems()]
+        result = self.call('./run_daemon.sh {daemon} {options} {command}'.format(daemon=daemon, options=' '.join(options), command=command))
         return result
 
 
@@ -31,6 +34,17 @@ class TestDaemon(TestConsole):
         result_status = self.command('simple.py', 'status')
         self.assertRegexpMatches(result_status, r'^running \([0-9]+\)$')
         result_restart = self.command('simple.py', 'restart')
+        result_status = self.command('simple.py', 'status')
+        self.assertRegexpMatches(result_status, r'^running \([0-9]+\)$')
+        result_stop = self.command('simple.py', 'stop')
+        result_status = self.command('simple.py', 'status')
+        self.assertEqual(result_status, 'stopped\n')
+
+    def test_start_stop_with_options(self):
+        args = {
+            'param': 'not default value'
+        }
+        result_start = self.command('simple.py', 'start', args=args)
         result_status = self.command('simple.py', 'status')
         self.assertRegexpMatches(result_status, r'^running \([0-9]+\)$')
         result_stop = self.command('simple.py', 'stop')

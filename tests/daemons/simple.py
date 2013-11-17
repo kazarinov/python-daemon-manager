@@ -14,9 +14,10 @@ logging.root.setLevel(logging.DEBUG)
 
 
 class MyDaemon(Daemon):
-    def run(self, param=True):
+    def run(self, param='default'):
         while True:
             print "running"
+            log.debug("param=%s", param)
             log.debug('running')
             time.sleep(1)
 
