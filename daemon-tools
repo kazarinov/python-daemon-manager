@@ -1,0 +1,7 @@
+#! /usr/bin/python
+
+from upstart.cli import CLI
+
+if __name__ == '__main__':
+    cli = CLI()
+    cli.execute()

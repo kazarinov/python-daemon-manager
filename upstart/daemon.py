@@ -34,9 +34,15 @@ class Daemon(object):
         self.DEBUG = False
         self.run_args = {}
         signal.signal(signal.SIGHUP, self._sighup_hook)
+        signal.signal(signal.SIGTERM, self._sigterm_hook)
 
     def _sighup_hook(self, signum, frame):
         self.reload()
+
+    def _sigterm_hook(self, signum, frame):
+        self.delpid()
+        self.pre_stop()
+        sys.exit(0)
 
     @property
     def manager(self):
@@ -44,45 +50,51 @@ class Daemon(object):
             self._manager = ProcessManager()
         return self._manager
 
-    def daemonize(self, expect='daemon'):
-        if expect == 'daemon':
-            try:
-                pid = os.fork()
-                if pid > 0:
-                    # exit first parent
-                    sys.exit(0)
-            except OSError, e:
-                sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
-                sys.exit(1)
+    def _set_user(self):
+        pw_record = pwd.getpwnam(self.user)
+        user_uid = pw_record.pw_uid
+        user_gid = pw_record.pw_gid
+        os.setgid(user_gid)
+        os.setuid(user_uid)
+
+    def _write_pidfile(self, pid):
+        fpid = open(self.pidfile, 'w+')
+        fpid.write("%s\n" % pid)
+        fpid.close()
+        self.log.debug('created pidfile %s' % self.pidfile)
+
+    def daemonize(self):
+        try:
+            pid = os.fork()
+            if pid > 0:
+                # exit first parent
+                sys.exit(0)
+        except OSError, e:
+            sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+            sys.exit(1)
+
+        if self.user:
+            self._set_user()
 
         # decouple from parent environment
         os.chdir("/")
         os.setsid()
         os.umask(0)
 
-        if self.user:
-            pw_record = pwd.getpwnam(self.user)
-            user_uid = pw_record.pw_uid
-            user_gid = pw_record.pw_gid
-            os.setgid(user_gid)
-            os.setuid(user_uid)
-
-        if expect == 'daemon' or expect == 'fork':
-            # do second fork
-            try:
-                pid = os.fork()
-                if pid > 0:
-                    # exit from second parent
-                    sys.exit(0)
-            except OSError, e:
-                sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
-                sys.exit(1)
+        # do second fork
+        try:
+            pid = os.fork()
+            if pid > 0:
+                # exit from second parent
+                sys.exit(0)
+        except OSError, e:
+            sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
+            sys.exit(1)
 
         # write pidfile
         pid = str(os.getpid())
-        file(self.pidfile,'w+').write("%s\n" % pid)
+        self._write_pidfile(pid)
         atexit.register(self.delpid)
-        self.log.debug('created pidfile %s' % self.pidfile)
 
         #redirect standard file descriptors
         sys.stdout.flush()
@@ -96,7 +108,8 @@ class Daemon(object):
         self.log.debug('redirect standard file descriptors')
 
     def delpid(self):
-        os.remove(self.pidfile)
+        if os.path.exists(self.pidfile):
+            os.remove(self.pidfile)
 
     @property
     def pid(self):
@@ -108,7 +121,7 @@ class Daemon(object):
             pid = None
         return pid
 
-    def start(self, daemonize='daemon'):
+    def start(self, daemonize=True):
         """
         Don't override!
         Start the daemon
@@ -118,7 +131,8 @@ class Daemon(object):
             sys.exit(1)
         else:
             self.pre_start()
-            self.daemonize(expect=daemonize)
+            if daemonize:
+                self.daemonize()
             self.log.debug('starting daemon...')
             self.run(**self.run_args)
 
@@ -147,16 +161,13 @@ class Daemon(object):
         pid = self.pid
 
         if pid:
-            self.log.debug('pre stopping...')
-            self.pre_stop()
             self.log.debug('stopping...')
-
             terminated = self.terminate(pid, force)
             if terminated:
                 if os.path.exists(self.pidfile):
                     os.remove(self.pidfile)
                 self.log.debug('stopped')
-                self.pre_stop()
+                self.post_stop()
                 self.log.debug('post stopping...')
                 print 'stopped'
             else:
@@ -203,21 +214,21 @@ class Daemon(object):
             return r'(.*?)%s(\x00)+(.*?)%s(.*?)start(\x00)*' % (self.daemon, self.pidfile)
 
     def get_lost_processes(self):
-        fount_processes = set(self.manager.find(self.get_grepline()))
+        found_processes = set(self.manager.find(self.get_grepline()))
         running_process = self.manager.get(os.getpid())
         running_processes = set(running_process.ancestors)
         running_processes.add(running_process)
-        fount_processes = fount_processes - running_processes
+        found_processes = found_processes - running_processes
 
         if self.pid:
             process = self.manager.get(self.pid)
             if process:
-                fount_processes.remove(process)
-                return fount_processes - set(process.descendants)
+                found_processes.remove(process)
+                return found_processes - set(process.descendants)
             else:
-                return fount_processes
+                return found_processes
         else:
-            return fount_processes
+            return found_processes
 
     def status(self):
         '''

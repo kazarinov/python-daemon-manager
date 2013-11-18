@@ -20,7 +20,7 @@ class ProcessManager(object):
         processes = self.get_all()
         found_processes = []
         for process in processes:
-            if re.search(pattern, process.cmdline, re.I):
+            if process.cmdline == pattern or re.search(pattern, process.cmdline, re.I):
                 found_processes.append(process)
         return found_processes
 

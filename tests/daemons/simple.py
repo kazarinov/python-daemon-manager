@@ -1,11 +1,16 @@
 #! /usr/bin/python
-from upstart.daemon import Daemon
+import sys
 import time
 import logging
 import os
 
+sys.path.append('/vagrant/Python/ProcessMaster')
+
+from upstart.daemon import Daemon
+
+
 log = logging.getLogger('test')
-handler = logging.FileHandler(os.path.abspath('tests/daemons/logs/test.log'))
+handler = logging.FileHandler('/vagrant/Python/ProcessMaster/tests/daemons/logs/daemon-test.log')
 handler.setFormatter(logging.Formatter('%(asctime)s %(process)d/%(thread)d %(levelname)s %(message)s'))
 handler.setLevel(logging.DEBUG)
 log.addHandler(handler)
@@ -25,6 +30,6 @@ class MyDaemon(Daemon):
 if __name__ == '__main__':
     MyDaemon(
         log=log,
-        pidfile=os.path.abspath('tests/daemons/run/test.pid'),
+        pidfile=os.path.abspath('/vagrant/Python/ProcessMaster/tests/daemons/run/daemon-test.pid'),
         stop_timeout=1
     ).execute()
