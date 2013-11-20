@@ -19,6 +19,9 @@ class Daemon(object):
                  pidfile=None,
                  user=None,
                  stop_timeout=5,
+                 terminate_signal=signal.SIGTERM,
+                 kill_signal=signal.SIGKILL,
+                 reload_signal=signal.SIGHUP,
                  stdin='/dev/null',
                  stdout='/dev/null',
                  stderr='/dev/null'):
@@ -29,12 +32,21 @@ class Daemon(object):
         self.default_pidfile = pidfile is not None
         self.pidfile = pidfile
         self.user = user
+
         self.stop_timeout = stop_timeout
+
         self._manager = None
         self.DEBUG = False
         self.run_args = {}
-        signal.signal(signal.SIGHUP, self._sighup_hook)
-        signal.signal(signal.SIGTERM, self._sigterm_hook)
+
+        self.terminate_signal = terminate_signal
+        self.kill_signal = kill_signal
+        self.reload_signal = reload_signal
+        self._set_signals_hooks()
+
+    def _set_signals_hooks(self):
+        signal.signal(self.reload_signal, self._sighup_hook)
+        signal.signal(self.terminate_signal, self._sigterm_hook)
 
     def _sighup_hook(self, signum, frame):
         self.reload()
@@ -141,9 +153,9 @@ class Daemon(object):
             stop_time = time.time()
             while True:
                 if force or time.time() - stop_time > self.stop_timeout:
-                    os.kill(pid, signal.SIGKILL)
+                    os.kill(pid, self.kill_signal)
                 else:
-                    os.kill(pid, signal.SIGTERM)
+                    os.kill(pid, self.terminate_signal)
                 time.sleep(0.2)
         except OSError, err:
             err = str(err)
@@ -164,8 +176,6 @@ class Daemon(object):
             self.log.debug('stopping...')
             terminated = self.terminate(pid, force)
             if terminated:
-                if os.path.exists(self.pidfile):
-                    os.remove(self.pidfile)
                 self.log.debug('stopped')
                 self.post_stop()
                 self.log.debug('post stopping...')
@@ -174,6 +184,9 @@ class Daemon(object):
                 print 'cannot stop process (%s)' % pid
         else:
             print 'not running'
+
+        if os.path.exists(self.pidfile):
+            os.remove(self.pidfile)
 
         lost_processes = self.get_lost_processes()
         if lost_processes:
@@ -190,7 +203,7 @@ class Daemon(object):
         Restart the daemon
         """
         self.stop()
-        self.start()
+        return self.start()
 
     def _reload(self):
         if not self.pid:
@@ -198,7 +211,7 @@ class Daemon(object):
         else:
             process = self.manager.get(self.pid)
             if process:
-                process.signal(signal.SIGHUP)
+                process.signal(self.reload_signal)
                 print 'reloaded'
             else:
                 print "process with pid {pid} not found".format(pid=pid)
@@ -253,6 +266,7 @@ class Daemon(object):
 
         lost_processes = self.get_lost_processes()
         if lost_processes:
+            result = False
             print 'lost pids: %s' % ','.join([str(process.pid) for process in lost_processes])
         return result
 

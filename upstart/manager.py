@@ -10,6 +10,7 @@ import yaml
 import sys
 
 from .daemon import Daemon
+from .settings import SETTINGS_MANAGER
 
 
 log = logging.getLogger(__name__)
@@ -72,19 +73,43 @@ class Manager(object):
 
 
 class DaemonConfiguration(Daemon):
-    def __init__(self, pidfile, run, user=None, respawn=False, respawn_limit=0, respawn_interval=0, expect=None):
+    def __init__(self, pidfile,
+                 run,
+                 user=None,
+                 respawn=False,
+                 respawn_limit=0,
+                 respawn_interval=0,
+                 expect=None,
+
+                 start_timeout=SETTINGS_MANAGER['defaults']['timeouts']['start'],
+                 stop_timeout=SETTINGS_MANAGER['defaults']['timeouts']['stop'],
+
+                 terminate_signal=SETTINGS_MANAGER['defaults']['signals']['terminate'],
+                 kill_signal=SETTINGS_MANAGER['defaults']['signals']['kill'],
+                 reload_signal=SETTINGS_MANAGER['defaults']['signals']['reload'],
+    ):
         self.run_script = run
+
         self.respawn = respawn
         self.respawn_limit = respawn_limit
         self.respawn_interval = respawn_interval
         self.expect = expect
         self.crash_number = 0
         self.respawn_time = time.time()
+        self.start_timeout = start_timeout
+
         self.pre_start_script = None
         self.pre_stop_script = None
         self.post_stop_script = None
+
         log = logging.getLogger()
-        super(DaemonConfiguration, self).__init__(log, pidfile, user)
+        super(DaemonConfiguration, self).__init__(
+            log, pidfile, user,
+            stop_timeout=stop_timeout,
+            terminate_signal=terminate_signal,
+            kill_signal=kill_signal,
+            reload_signal=reload_signal
+        )
 
     def _prepare_run(self):
         if self.user:
@@ -104,17 +129,16 @@ class DaemonConfiguration(Daemon):
         if not self.expect:
             return popen.pid
         else:
+            time.sleep(self.start_timeout)
             processes = self.manager.find(self.get_grepline())
             child_pid = None
             for process in processes:
-                if (self.expect == 'fork' and 0 < process.pid - popen.pid < 5) or \
-                   (self.expect == 'daemon' and 1 < process.pid - popen.pid < 8) :
-                    if not child_pid:
-                        child_pid = process.pid
-                    else:
-                        raise DaemonConfigurationError('two forked proceesses were found: %s and %s' %
+                if process.parent_pid == 1:
+                    child_pid = process.pid
+                else:
+                    raise DaemonConfigurationError('two forked proceesses were found: %s and %s' %
                                                        (child_pid, process.pid))
-
+            log.debug('child_pid %s', child_pid)
             return child_pid
 
     def get_grepline(self):
@@ -131,6 +155,7 @@ class DaemonConfiguration(Daemon):
             self.pre_start()
             self.log.debug('starting daemon...')
             pid = self.run()
+            self.log.debug('started daemon (%s)', pid)
             self._write_pidfile(pid)
             return pid
 
@@ -163,17 +188,17 @@ class DaemonConfiguration(Daemon):
         if not run:
             raise AttributeError('run is not specified')
 
-        respawn_raw = config.get('respawn')
-        respawn_limit = 5
-        respawn_interval = 5
+        respawn_raw = config.get('respawn', SETTINGS_MANAGER['defaults']['respawn'])
+        respawn_limit = SETTINGS_MANAGER['defaults']['respawn']['limit']
+        respawn_interval = SETTINGS_MANAGER['defaults']['respawn']['interval']
         if isinstance(respawn_raw, dict):
             try:
-                respawn_limit = int(respawn_raw.get('limit', 5))
+                respawn_limit = int(respawn_raw.get('limit', respawn_limit))
             except ValueError:
                 raise AttributeError('respawn:limit must be integer')
 
             try:
-                respawn_interval = int(respawn_raw.get('interval', 5))
+                respawn_interval = int(respawn_raw.get('interval', respawn_interval))
             except ValueError:
                 raise AttributeError('respawn:interval must be integer')
 
@@ -181,13 +206,18 @@ class DaemonConfiguration(Daemon):
         else:
             respawn = bool(respawn_raw)
 
-        expect = config.get('expect', False)
+        expect = config.get('expect', SETTINGS_MANAGER['defaults']['expect'])
         if expect not in ['fork', 'daemon', False]:
             raise AttributeError('expect must be fork or daemon or not exist')
 
-        signals = config.get('signals', {})
-        signals.get('terminate')
-        signals.get('reload')
+        signals = config.get('signals', SETTINGS_MANAGER['defaults']['signals'])
+        terminate_signal = signals.get('terminate', SETTINGS_MANAGER['defaults']['signals']['terminate'])
+        kill_signal = signals.get('kill', SETTINGS_MANAGER['defaults']['signals']['kill'])
+        reload_signal = signals.get('reload', SETTINGS_MANAGER['defaults']['signals']['reload'])
+
+        timeouts = config.get('timeouts', SETTINGS_MANAGER['defaults']['timeouts'])
+        start_timeout = signals.get('start', SETTINGS_MANAGER['defaults']['timeouts']['start'])
+        stop_timeout = signals.get('stop', SETTINGS_MANAGER['defaults']['timeouts']['stop'])
 
         return DaemonConfiguration(
             pidfile=pidfile,
@@ -196,7 +226,14 @@ class DaemonConfiguration(Daemon):
             respawn=respawn,
             respawn_limit=respawn_limit,
             respawn_interval=respawn_interval,
-            expect=expect
+            expect=expect,
+
+            start_timeout=start_timeout,
+            stop_timeout=stop_timeout,
+
+            terminate_signal=terminate_signal,
+            kill_signal=kill_signal,
+            reload_signal=reload_signal
         )
 
 

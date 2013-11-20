@@ -18,7 +18,7 @@ class CLI(object):
     def __init__(self):
         self.manager = Manager(SETTINGS_MANAGER.get('configs'))
         self.optparser = optparse.OptionParser()
-        self.optparser.set_usage("Usage: daemon-tools (start|stop|restart|reload|status) [name]")
+        self.optparser.set_usage("Usage: daemon-tools (start|stop|restart|reload|list|status) [name]")
 
     def list(self):
         if not self.manager.daemons:
@@ -64,9 +64,13 @@ class CLI(object):
     def restart(self, name):
         if name == 'all':
             for daemon_name in self.manager.daemons.iterkeys():
-                self.manager.restart(daemon_name)
+                print ' * restarting %s ...' % daemon_name,
+                pid = self.manager.restart(daemon_name)
+                print 'restarted (%s)' % pid
         elif name in self.manager.daemons:
-            self.manager.restart(name)
+            print 'restarting %s ...' % name,
+            pid = self.manager.restart(name)
+            print 'restarted (%s)' % pid
         elif name:
             self.optparser.error('name %s is not found' % name)
         else:

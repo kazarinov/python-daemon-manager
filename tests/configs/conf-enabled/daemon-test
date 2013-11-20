@@ -8,6 +8,10 @@ respawn:
 
 signals:
     kill: 15
-    reload: 2
+    reload: 10
+
+timeouts:
+    start: 2
+    stop: 5
 
 run: /vagrant/Python/ProcessMaster/tests/daemons/simple.py start
