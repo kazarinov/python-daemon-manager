@@ -102,6 +102,8 @@ class DaemonConfiguration(Daemon):
         self.pre_stop_script = None
         self.post_stop_script = None
 
+        self._pid = None
+
         log = logging.getLogger()
         super(DaemonConfiguration, self).__init__(
             log, pidfile, user,
@@ -117,6 +119,13 @@ class DaemonConfiguration(Daemon):
         os.chdir("/")
         os.setsid()
         os.umask(0)
+
+    @property
+    def pid(self):
+        pid = super(DaemonConfiguration, self).pid
+        if pid != self._pid:
+            self.crash_number = 0
+        return pid
 
     def call(self, command):
         args = shlex.split(command)

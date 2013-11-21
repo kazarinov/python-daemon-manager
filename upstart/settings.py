@@ -6,7 +6,7 @@ DEBUG = True
 SETTINGS_MANAGER = {
     'log': {
         'dir': '/var/log/',
-        'filename': 'daemon-manager.log',
+        'filename': 'daemon-runtime.log',
         'level': logging.DEBUG
     },
     'configs': '/etc/daemon-manager',
@@ -18,7 +18,7 @@ SETTINGS_MANAGER = {
             'stop': 5
         },
         'respawn': {
-            'limit': 5,
+            'limit': 0,
             'interval': 5
         },
         'expect': False,
@@ -39,8 +39,8 @@ SETTINGS_TOOLS = {
 }
 
 if DEBUG:
-    SETTINGS_MANAGER['log']['dir'] = 'tests/daemons/logs/'
-    SETTINGS_MANAGER['configs'] = 'tests/configs'
-    SETTINGS_MANAGER['pid'] = 'tests/daemons/run/daemon-manager.pid'
+    SETTINGS_MANAGER['log']['dir'] = '/vagrant/Python/ProcessMaster/tests/daemons/logs/'
+    SETTINGS_MANAGER['configs'] = '/vagrant/Python/ProcessMaster/tests/configs'
+    SETTINGS_MANAGER['pid'] = '/vagrant/Python/ProcessMaster/tests/daemons/run/daemon-manager.pid'
 
-    SETTINGS_TOOLS['log']['dir'] = 'tests/daemons/logs/'
+    SETTINGS_TOOLS['log']['dir'] = '/vagrant/Python/ProcessMaster/tests/daemons/logs/'

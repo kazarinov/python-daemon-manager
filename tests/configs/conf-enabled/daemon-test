@@ -5,6 +5,7 @@ expect: daemon
 respawn:
     limit: 5
     interval: 5
+    timeout:
 
 signals:
     kill: 15

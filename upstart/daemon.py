@@ -6,6 +6,7 @@ import pwd
 import time
 import optparse
 import re
+from multiprocessing import Process
 
 from .processes import ProcessManager
 
@@ -52,8 +53,8 @@ class Daemon(object):
         self.reload()
 
     def _sigterm_hook(self, signum, frame):
-        self.delpid()
         self.pre_stop()
+        self.delpid()
         sys.exit(0)
 
     @property
@@ -185,8 +186,7 @@ class Daemon(object):
         else:
             print 'not running'
 
-        if os.path.exists(self.pidfile):
-            os.remove(self.pidfile)
+        self.delpid()
 
         lost_processes = self.get_lost_processes()
         if lost_processes:
@@ -252,6 +252,7 @@ class Daemon(object):
         pid = self.pid
         if pid is None:
             print 'stopped'
+            result = True
         else:
             process = self.manager.get(pid)
             if process is None:
@@ -365,3 +366,11 @@ class Daemon(object):
             self.status()
         else:
             optparser.error("command %s is not found" % command)
+
+
+class DaemonMaster(Daemon):
+    pass
+
+
+class DaemonWorker(Process):
+    pass
