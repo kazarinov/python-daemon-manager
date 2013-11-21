@@ -1,5 +1,5 @@
 #! /bin/bash
 
-export PYTHONPATH=../:./:./bin:/usr/local/lib/python2.7/dist-packages:$PYTHONPATH
+export PYTHONPATH=/vagrant/Python/ProcessMaster:/usr/local/lib/python2.7/dist-packages:$PYTHONPATH
 
-python -B ./tests/daemons/$@
+python -B /vagrant/Python/ProcessMaster/tests/daemons/$@
