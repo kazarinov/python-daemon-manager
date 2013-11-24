@@ -1,4 +1,4 @@
-pid: /vagrant/Python/ProcessMaster/tests/daemons/run/daemon-test3.pid
+pid: /vagrant/Python/ProcessMaster/tests/daemons/run/workers-test.pid
 user: vagrant
 expect: daemon
 
@@ -15,3 +15,6 @@ timeouts:
     stop: 5
 
 run: /vagrant/Python/ProcessMaster/tests/daemons/workers.py start
+stop: /vagrant/Python/ProcessMaster/tests/daemons/workers.py stop
+
+
