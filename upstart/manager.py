@@ -75,6 +75,7 @@ class Manager(object):
 class DaemonConfiguration(Daemon):
     def __init__(self, pidfile,
                  run,
+                 stop=None,
                  user=None,
                  respawn=False,
                  respawn_limit=0,
@@ -89,6 +90,7 @@ class DaemonConfiguration(Daemon):
                  reload_signal=SETTINGS_MANAGER['defaults']['signals']['reload'],
     ):
         self.run_script = run
+        self.stop_script = stop
 
         self.respawn = respawn
         self.respawn_limit = respawn_limit
@@ -127,7 +129,7 @@ class DaemonConfiguration(Daemon):
             self.crash_number = 0
         return pid
 
-    def call(self, command):
+    def call(self, command, expect=None, block=False):
         args = shlex.split(command)
         popen = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=self._prepare_run)
         popen_process = self.manager.get(popen.pid)
@@ -135,16 +137,19 @@ class DaemonConfiguration(Daemon):
         if not popen_process:
             raise DaemonConfigurationError('cannot run process %s' % command)
 
-        if not self.expect:
+        if block:
+            popen.stdout.read()
+
+        if not expect:
             return popen.pid
         else:
             time.sleep(self.start_timeout)
             processes = self.manager.find(self.get_grepline())
             child_pid = None
             for process in processes:
-                if process.parent_pid == 1:
+                if not child_pid and process.parent_pid == 1:
                     child_pid = process.pid
-                else:
+                elif child_pid and process.parent_pid == 1:
                     raise DaemonConfigurationError('two forked proceesses were found: %s and %s' %
                                                        (child_pid, process.pid))
             log.debug('child_pid %s', child_pid)
@@ -153,8 +158,14 @@ class DaemonConfiguration(Daemon):
     def get_grepline(self):
         return self.run_script.replace(' ', '\x00')
 
+    def stop(self, force=False):
+        if self.stop_script:
+            return self.call(self.stop_script, block=True)
+        else:
+            super(DaemonConfiguration, self).stop(force)
+
     def run(self):
-        return self.call(self.run_script)
+        return self.call(self.run_script, self.expect)
 
     def start(self, daemonize=False):
         if self.pid:
@@ -197,6 +208,8 @@ class DaemonConfiguration(Daemon):
         if not run:
             raise AttributeError('run is not specified')
 
+        stop = config.get('stop')
+
         respawn_raw = config.get('respawn', SETTINGS_MANAGER['defaults']['respawn'])
         respawn_limit = SETTINGS_MANAGER['defaults']['respawn']['limit']
         respawn_interval = SETTINGS_MANAGER['defaults']['respawn']['interval']
@@ -231,6 +244,7 @@ class DaemonConfiguration(Daemon):
         return DaemonConfiguration(
             pidfile=pidfile,
             run=run,
+            stop=stop,
             user=config.get('user'),
             respawn=respawn,
             respawn_limit=respawn_limit,
