@@ -1,11 +1,11 @@
 import logging
 import signal
 
-DEBUG = True
+DEBUG = False
 
 SETTINGS_MANAGER = {
     'log': {
-        'dir': '/var/log/',
+        'dir': '/var/log/daemon-manager/',
         'filename': 'daemon-runtime.log',
         'level': logging.DEBUG
     },
@@ -32,7 +32,7 @@ SETTINGS_MANAGER = {
 
 SETTINGS_TOOLS = {
     'log': {
-        'dir': '/var/log/',
+        'dir': '/var/log/daemon-manager/',
         'filename': 'daemon-tools.log',
         'level': logging.DEBUG
     },
