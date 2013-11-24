@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-import sys, os, atexit
+import sys, os
 import inspect
 import signal
 import pwd
 import time
 import optparse
 import re
-from multiprocessing import Process
+from multiprocessing import Process, Value
+from itertools import cycle
 
 from .processes import ProcessManager
 
@@ -54,7 +55,6 @@ class Daemon(object):
 
     def _sigterm_hook(self, signum, frame):
         self.pre_stop()
-        self.delpid()
         sys.exit(0)
 
     @property
@@ -107,7 +107,6 @@ class Daemon(object):
         # write pidfile
         pid = str(os.getpid())
         self._write_pidfile(pid)
-        atexit.register(self.delpid)
 
         #redirect standard file descriptors
         sys.stdout.flush()
@@ -163,7 +162,7 @@ class Daemon(object):
             if err.find("No such process") > 0:
                 return True
             else:
-                print err
+                self.log.debug("Couldn't stop process %s: %s", pid, err)
                 return False
 
     def stop(self, force=False):
@@ -188,14 +187,17 @@ class Daemon(object):
 
         self.delpid()
 
-        lost_processes = self.get_lost_processes()
-        if lost_processes:
-            for process in lost_processes:
-                terminated = self.terminate(process.pid, force)
-                if terminated:
-                    print 'stopped lost process (%s)' % process.pid
-                else:
-                    print 'cannot stop lost process (%s)' % process.pid
+        while True:
+            lost_processes = self.get_lost_processes()
+            if lost_processes:
+                for process in lost_processes:
+                    terminated = self.terminate(process.pid, force)
+                    if terminated:
+                        print 'stopped lost process (%s)' % process.pid
+                    else:
+                        print 'cannot stop lost process (%s)' % process.pid
+            else:
+                break
 
     def restart(self):
         """
@@ -369,8 +371,103 @@ class Daemon(object):
 
 
 class DaemonMaster(Daemon):
-    pass
+    def __init__(self,
+                 log,
+                 pidfile=None,
+                 user=None,
+                 worker_activity=False,
+                 worker_timeout=600,
+                 stop_timeout=5,
+                 terminate_signal=signal.SIGTERM,
+                 kill_signal=signal.SIGKILL,
+                 reload_signal=signal.SIGHUP,
+                 stdin='/dev/null',
+                 stdout='/dev/null',
+                 stderr='/dev/null'):
+        super(DaemonMaster, self).__init__(log, pidfile, user, stop_timeout, terminate_signal, kill_signal,
+                                           reload_signal, stdin, stdout, stderr)
+        self.worker_timeout = worker_timeout
+        self.worker_activity = worker_activity
+        self.workers = []
+
+    def get_workers(self):
+        return self.workers
+
+    def start_worker(self, worker):
+        raise NotImplemented
+
+    def stop_worker(self, process):
+        try:
+            stop_time = time.time()
+            while True:
+                if time.time() - stop_time > self.stop_timeout:
+                    os.kill(process.pid, self.kill_signal)
+                else:
+                    os.kill(process.pid, self.terminate_signal)
+                time.sleep(0.2)
+        except OSError, err:
+            err = str(err)
+            if err.find("No such process") > 0:
+                return True
+            else:
+                self.log.debug("Couldn't stop worker %s: %s", process.pid, err)
+                return False
+
+    def run(self):
+        workers = self.get_workers()
+        service_workers = []
+
+        for worker in workers:
+            worker.start()
+            service_workers.append([worker])
+
+        def hook(signum, frame):
+            self.log.debug('received signal %s', signum)
+            for processes in service_workers:
+                if processes:
+                    worker = processes[0]
+                    if signum == self.terminate_signal:
+                        self.terminate(worker.pid)
+                    else:
+                        try:
+                            os.kill(worker.pid, signum)
+                        except OSError:
+                            self.log.debug("couldn't transfer signal %s to process %s", signum, worker.pid)
+
+            if signum == self.terminate_signal:
+                os._exit(0)
+
+        signal.signal(self.terminate_signal, hook)
+        signal.signal(self.reload_signal, hook)
+
+        for processes in cycle(service_workers):
+            worker = processes[0]
+
+            if self.worker_activity and not worker.is_active(self.worker_timeout):
+                self.stop_worker(worker)
+
+            if not worker.is_alive():
+                self.log.info('process %s failed, restarting', worker.pid)
+                try:
+                    worker.join()
+                except OSError:
+                    pass
+                processes.pop()
+                new_worker = self.start_worker(worker)
+                new_worker.start()
+                processes.append(new_worker)
+                self.log.info('new process %s started', new_worker.pid)
+            time.sleep(1)
 
 
 class DaemonWorker(Process):
-    pass
+    def __init__(self):
+        super(DaemonWorker, self).__init__()
+        self.last_activity = Value('d', time.time())
+
+    def is_active(self, timeout=600):
+        return time.time() - self.last_activity.value <= timeout
+
+    def active(self):
+        self.last_activity = time.time()
+

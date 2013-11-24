@@ -1,0 +1,17 @@
+pid: /vagrant/Python/ProcessMaster/tests/daemons/run/daemon-test3.pid
+user: vagrant
+expect: daemon
+
+respawn:
+    limit: 5
+    interval: 5
+
+signals:
+    kill: 15
+    reload: 10
+
+timeouts:
+    start: 2
+    stop: 5
+
+run: /vagrant/Python/ProcessMaster/tests/daemons/workers.py start
