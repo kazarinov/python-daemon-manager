@@ -1,0 +1,1 @@
+* * * * * root /etc/daemon-manager/watcher.sh lenta-indexer

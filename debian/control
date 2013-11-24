@@ -1,0 +1,20 @@
+Source: python-daemon-manager
+Section: misc
+Priority: extra
+Maintainer: Andrey Kazarinov <andrei.kazarinov@gmail.com>
+Build-Depends:
+    debhelper (>=7),
+    python (>=2.6),
+    cdbs,
+    python-central
+Standards-Version: 3.9.1
+XS-Python-Version: >= 2.7
+Homepage: https://github.com/kazarinov/python-daemon-manager
+Vcs-Git: git@github.com:kazarinov/python-daemon-manager.git
+Vcs-Browser: https://github.com/kazarinov/python-daemon-manager
+
+Package: python-daemon-manager
+Architecture: all
+XB-Python-Version: >= 2.7
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
+Description: Daemon manager

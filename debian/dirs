@@ -1,0 +1,8 @@
+/etc/daemon-manager
+/etc/daemon-manager/conf-enabled
+/etc/daemon-manager/conf-available
+/etc/daemon-manager/hooks
+/etc/daemon-manager/hooks/pre-start
+/etc/daemon-manager/hooks/pre-stop
+/etc/daemon-manager/hooks/post-stop
+/var/log/daemon-manager

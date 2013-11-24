@@ -1,0 +1,17 @@
+#! /bin/bash
+
+case $1 in
+    configure)
+        ln -s /usr/lib/python2.7/site-packages/upstart /usr/lib/python2.7/dist-packages/upstart
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument"
+        exit 1
+    ;;
+esac
+
+exit 0
