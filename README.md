@@ -1,4 +1,11 @@
 python-daemon-manager
+====================
+
+python-daemon-manager is a daemon manager and framework that allows you to easily implement daemon managing
+functions in dozens lines of code.
+
+It provides easy and flexible API for Python and simplest configuration file you ever seen
+
 
 Installation
 ============
@@ -99,3 +106,45 @@ if __name__ == '__main__':
         stop_timeout=1
     ).execute()
 ```
+
+Writing configuration file
+==========================
+
+A simpliest example of config 
+
+```yaml
+pid: daemon-test.pid 
+expect: daemon
+run: simple.py start
+```
+
+* pid - path to pid file
+* expect - (None, fork, daemon) - expecting daemonization mechanizm of running script
+* run - path to running script
+
+Put this file to /etc/daemon-manager/conf-enabled/simple-daemon and run
+
+```bash
+daemon-tools list
+> Following daemons are enabled:
+> * simple-daemon
+```
+
+
+```bash
+daemon-tools status
+> * simple-daemon is stopped
+```
+ 
+
+```bash
+daemon-tools start simple-daemon
+> starting simple-daemon ... started (22921)
+```
+
+
+```bash
+daemon-tools status
+> * simple-daemon is running (22921)
+```
+ 
