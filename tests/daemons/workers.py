@@ -48,5 +48,5 @@ if __name__ == '__main__':
     MyDaemonMaster(
         log=log,
         pidfile=os.path.abspath('/vagrant/Python/ProcessMaster/tests/daemons/run/workers-test.pid'),
-        stop_timeout=1
+        stop_timeout=15
     ).execute()

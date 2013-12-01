@@ -121,5 +121,7 @@ class CLI(object):
             self.reload(name)
         elif command=='list':
             self.list()
+        elif command=='help':
+            self.optparser.print_help()
         else:
             self.optparser.error('command %s is not found' % name)

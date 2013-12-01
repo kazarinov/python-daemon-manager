@@ -170,6 +170,10 @@ class Daemon(object):
         Don't override!
         Stop the daemon
         """
+        self.stop_main_process(force)
+        self.kill_lost_processes(force)
+
+    def stop_main_process(self, force):
         pid = self.pid
 
         if pid:
@@ -187,6 +191,7 @@ class Daemon(object):
 
         self.delpid()
 
+    def kill_lost_processes(self, force):
         while True:
             lost_processes = self.get_lost_processes()
             if lost_processes:
@@ -396,6 +401,9 @@ class DaemonMaster(Daemon):
     def start_worker(self, worker):
         raise NotImplemented
 
+    def stop(self, force=False):
+        self.stop_main_process(force)
+
     def stop_worker(self, process):
         try:
             stop_time = time.time()
@@ -427,7 +435,8 @@ class DaemonMaster(Daemon):
                 if processes:
                     worker = processes[0]
                     if signum == self.terminate_signal:
-                        self.terminate(worker.pid)
+                        self.log.debug('terminating worker %s', worker.pid)
+                        worker.terminate()
                     else:
                         try:
                             os.kill(worker.pid, signum)

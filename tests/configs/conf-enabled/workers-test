@@ -12,7 +12,7 @@ signals:
 
 timeouts:
     start: 2
-    stop: 5
+    stop: 15
 
 run: /vagrant/Python/ProcessMaster/tests/daemons/workers.py start
 stop: /vagrant/Python/ProcessMaster/tests/daemons/workers.py stop

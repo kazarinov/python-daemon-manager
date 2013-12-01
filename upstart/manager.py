@@ -133,15 +133,16 @@ class DaemonConfiguration(Daemon):
         args = shlex.split(command)
         popen = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=self._prepare_run)
         popen_process = self.manager.get(popen.pid)
+        result = ''
 
         if not popen_process:
             raise DaemonConfigurationError('cannot run process %s' % command)
 
         if block:
-            popen.stdout.read()
+            result = popen.stdout.read()
 
         if not expect:
-            return popen.pid
+            return popen.pid, result
         else:
             time.sleep(self.start_timeout)
             processes = self.manager.find(self.get_grepline())
@@ -153,19 +154,21 @@ class DaemonConfiguration(Daemon):
                     raise DaemonConfigurationError('two forked proceesses were found: %s and %s' %
                                                        (child_pid, process.pid))
             log.debug('child_pid %s', child_pid)
-            return child_pid
+            return child_pid, result
 
     def get_grepline(self):
         return self.run_script.replace(' ', '\x00')
 
     def stop(self, force=False):
         if self.stop_script:
-            return self.call(self.stop_script, block=True)
+            child_pid, result = self.call(self.stop_script, block=True)
+            print result,
         else:
             super(DaemonConfiguration, self).stop(force)
 
     def run(self):
-        return self.call(self.run_script, self.expect)
+        pid, result = self.call(self.run_script, self.expect)
+        return pid
 
     def start(self, daemonize=False):
         if self.pid:
